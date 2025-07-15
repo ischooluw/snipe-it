@@ -84,6 +84,21 @@ class ActionlogFactory extends Factory
         });
     }
 
+    public function manualNote(?User $user = null)
+    {
+        return $this
+            ->state(function (array $attributes) use ($user) {
+                return [
+                    'action_type' => 'manual_note',
+                    'item_type' => Asset::class,
+                    'target_type' => 'asset',
+                    'note' => 'Factory-generated manual note',
+                    'created_by' => $user?->id ?? User::factory(),
+                ];
+            })
+            ->for($user ?? User::factory(), 'user');
+    }
+
     public function licenseCheckoutToUser()
     {
         return $this->state(function () {

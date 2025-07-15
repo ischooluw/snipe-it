@@ -19,6 +19,7 @@ use App\Http\Requests\AssetCheckoutRequest;
 use App\Http\Transformers\AssetsTransformer;
 use App\Http\Transformers\LicensesTransformer;
 use App\Http\Transformers\SelectlistTransformer;
+use App\Models\ActionLog;
 use App\Models\Asset;
 use App\Models\AssetModel;
 use App\Models\Company;
@@ -867,6 +868,86 @@ class AssetsController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/hardware/message.does_not_exist')), 200);
+    }
+
+    /**
+     * Add a history note (ActionLog note) to an asset
+     *
+     * @author [N. West] [<nickkwest@gmail.com>]
+     * @param int $assetId
+     * @since [v8.1.18]
+     */
+    public function addHistoryNote(Request $request, $asset_id): JsonResponse
+    {
+        $this->authorize('update', Asset::class);
+
+        if ($request->input('note', '') == '') {
+            return response()->json(Helper::formatStandardApiResponse('error', null, trans('validation.required', ['attribute' => 'note'])), 200);
+        }
+
+        $asset = Asset::find($asset_id);
+
+        if ($asset) {
+            $this->authorize('update', $asset);
+
+            // Create the note
+            $note = new ActionLog();
+            $note->item_type = Asset::class;
+            $note->created_by = auth()->id();
+            $note->item_id = $asset->id;
+            $note->action_type = 'manual_note';
+            $note->note = $request->input('note', '');
+            $note->save();
+
+            // Return a success response
+            return response()->json(Helper::formatStandardApiResponse('success', ['note' => $note->note, 'id' => $asset->id], trans('general.note_added')));
+        }
+
+        return response()->json(Helper::formatStandardApiResponse('error', null, 'Asset not found'), 200);
+    }
+
+    /**
+     * Get the history notes for an asset
+     *
+     * @author [N. West] [<nickkwest@gmail.com>]
+     * @param int $assetId
+     * @since [v8.1.18]
+     */
+    public function getHistoryNotes(Request $request, $asset_id): JsonResponse
+    {
+        $this->authorize('view', Asset::class);
+
+        $asset = Asset::find($asset_id);
+
+        if($asset) {
+            $this->authorize('view', $asset);
+
+            // Get the history notes for the asset
+            $notes = ActionLog::with('user:id,username')
+                ->where('item_type', Asset::class)
+                ->where('item_id', $asset->id)
+                ->where('action_type', 'manual_note')
+                ->orderBy('created_at', 'desc')
+                ->get(['id', 'created_at', 'note', 'created_by', 'item_id', 'item_type', 'action_type', 'target_id', 'target_type']);
+
+            $notesArray = $notes->map(function ($note) {
+                return [
+                    'id' => $note->id,
+                    'created_at' => $note->created_at,
+                    'note' => $note->note,
+                    'created_by' => $note->created_by,
+                    'username' => $note->user?->username, // adding the username
+                    'item_id' => $note->item_id,
+                    'item_type' => $note->item_type,
+                    'action_type' => $note->action_type,
+                ];
+            });
+
+            // Return a success response
+            return response()->json(Helper::formatStandardApiResponse('success', ['notes' => $notesArray, 'id' => $asset->id]));
+        }
+
+        return response()->json(Helper::formatStandardApiResponse('error', null, 'Asset not found'), 200);
     }
 
     /**

@@ -461,6 +461,22 @@ Route::group(['prefix' => 'v1', 'middleware' => ['api', 'api-throttle:api']], fu
             ]
         )->name('api.assets.licenselist');
 
+        Route::get(
+            '{asset_id}/history_notes',
+            [
+                Api\AssetsController::class,
+                'getHistoryNotes'
+            ]
+        )->name('api.assets.notes');
+
+        Route::post(
+            '{asset_id}/history_note',
+            [
+                Api\AssetsController::class,
+                'addHistoryNote'
+            ]
+        )->name('api.asset.note');
+
         Route::get('bytag/{tag}',
             [
                 Api\AssetsController::class, 
